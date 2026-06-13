@@ -1,0 +1,21 @@
+# دوت إنف والملفات الحساسة
+.env
+*.zip
+*.xlsx
+*.csv
+
+# البيانات والسير الذاتية المحلية
+data/
+D:/
+
+# ملفات بايثون المؤقتة
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# بيئات العمل الافتراضية
+venv/
+env/
+.streamlit/config.toml
