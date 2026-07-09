@@ -2,20 +2,46 @@ import streamlit as st
 import pandas as pd
 import urllib.parse
 import os
+import sys
 import fitz  # PyMuPDF
 import glob
+from pathlib import Path
+
+# إضافة المسار الصحيح للوحدات
+sys.path.insert(0, os.path.dirname(__file__))
 from extract_cv_data import extract_all_data
 
 st.set_page_config(page_title="لوحة تحليل السير الذاتية المطورة", layout="wide")
 st.title("📄 لوحة تحليل السير الذاتية الاحترافية")
 
 # إدارة الإعدادات والمسارات عبر شريط جانبي آمن مرن
-BASE_FOLDER = st.sidebar.text_input("📁 مسار مجلد السير الذاتية الأساسي", value=r"D:\CVS project")
+# تم تعديل المسار الافتراضي للعمل مع GitHub والسحابة
+default_path = "./data"
+BASE_FOLDER = st.sidebar.text_input(
+    "📁 مسار مجلد السير الذاتية الأساسي", 
+    value=default_path
+)
 
+# تحقق من وجود المسار
 if not os.path.exists(BASE_FOLDER):
-    st.sidebar.error("المسار المحلي المحدد غير موجود! يرجى تصحيحه.")
+    st.sidebar.error(f"❌ المسار المحدد غير موجود: {BASE_FOLDER}")
+    st.sidebar.info("📍 المسارات المتاحة:")
+    st.sidebar.info(f"• المسار الحالي: {os.getcwd()}")
+    
+    # عرض المجلدات المتاحة
+    if os.path.exists("./"):
+        available = [d for d in os.listdir("./") if os.path.isdir(d)]
+        if available:
+            st.sidebar.write("المجلدات المتاحة:")
+            for folder in available:
+                st.sidebar.write(f"  • {folder}")
+    
+    st.info("⚠️ يرجى تصحيح المسار أو إنشاء مجلد data وإضافة ملفات السير الذاتية فيه")
     st.stop()
 
+st.sidebar.success(f"✅ تم تحميل المجلد: {BASE_FOLDER}")
+
+# البحث عن المجلدات الفرعية
 subfolders = [f.name for f in os.scandir(BASE_FOLDER) if f.is_dir()]
 if subfolders:
     selected_subfolder = st.sidebar.selectbox("📁 اختر المجلد الفرعي للمشروع", subfolders)
@@ -23,32 +49,44 @@ if subfolders:
 else:
     CV_FOLDER = BASE_FOLDER
 
-# إضافة صندوق نصي ديناميكي للوصف الوظيفي (Business & Product Management improvement)
+# إضافة صندوق نصي ديناميكي للوصف الوظيفي
 st.markdown("### 🎯 تخصيص متطلبات المطابقة والتوظيف")
 default_jd = "مأمور دعم فني | Technical support officer - خبرة في الشبكات والدعم الفني وصيانة الحواسب والأنظمة الفنية"
-job_description = st.text_area("📝 الصق الوصف الوظيفي للوظيفة الشاغرة هنا لضبط معايير التطابق آلياً:", value=default_jd, height=120)
+job_description = st.text_area(
+    "📝 الصق الوصف الوظيفي للوظيفة الشاغرة هنا لضبط معايير التطابق آلياً:", 
+    value=default_jd, 
+    height=120
+)
 
-# تحسين كفاءة النظام والأداء باستخدام الـ Caching (Systems Engineering Improvement)
+# تحسين كفاءة النظام والأداء باستخدام الـ Caching
 @st.cache_data(show_spinner="جاري معالجة وتحليل مستندات السير الذاتية... يرجى الانتظار قليلاً")
 def parse_and_load_cvs(folder_path, jd):
     records = []
     search_path = os.path.join(folder_path, '*')
     for filepath in glob.glob(search_path):
         if os.path.isfile(filepath):
-            record = extract_all_data(filepath, jd)
-            if record:
-                records.append(record)
+            try:
+                record = extract_all_data(filepath, jd)
+                if record:
+                    records.append(record)
+            except Exception as e:
+                st.warning(f"⚠️ خطأ في معالجة {os.path.basename(filepath)}: {str(e)}")
+                continue
     return pd.DataFrame(records)
 
 # استدعاء البيانات المعالجة بشكل مخزن مؤقتاً
 df = parse_and_load_cvs(CV_FOLDER, job_description)
 
 if df.empty:
-    st.warning("لا توجد سير ذاتية صالحة أو مقروءة في المجلد المختار حالياً.")
+    st.warning("⚠️ لا توجد سير ذاتية صالحة أو مقروءة في المجلد المختار حالياً.")
+    st.info("💡 تأكد من وجود ملفات PDF أو DOCX في مجلد data")
     st.stop()
+
+st.sidebar.success(f"✅ تم تحميل {len(df)} سيرة ذاتية")
 
 # زر إعادة ضبط الفلاتر التفاعلية
 if st.sidebar.button("🔄 إعادة تعيين الفلاتر"):
+    st.cache_data.clear()
     st.rerun()
 
 # الفلاتر واللوحات الجانبية المتقدمة
@@ -56,7 +94,11 @@ with st.sidebar:
     st.header("تصفية وفلترة المرشحين")
     city = st.selectbox("اختر المدينة", options=[""] + sorted(df.location.dropna().unique()))
     nationality = st.selectbox("اختر الجنسية", options=[""] + sorted(df.nationality.dropna().unique()))
-    match_level = st.multiselect("مستوى التطابق المستهدف", options=sorted(df.match_level.unique()), default=sorted(df.match_level.unique()))
+    match_level = st.multiselect(
+        "مستوى التطابق المستهدف", 
+        options=sorted(df.match_level.unique()), 
+        default=sorted(df.match_level.unique())
+    )
     min_experience = st.slider("أقل عدد سنوات خبرة عملية", min_value=0, max_value=30, value=0)
     search_text = st.text_input("🔍 بحث نصي حر شامل داخل الملفات")
 
@@ -74,7 +116,7 @@ if 'experience_years' in filtered_df.columns:
 if search_text:
     filtered_df = filtered_df[filtered_df.apply(lambda row: search_text.lower() in str(row).lower(), axis=1)]
 
-# عرض ملخص البيانات والإحصائيات الحيوية لمدراء المنتج
+# عرض ملخص البيانات والإحصائيات الحيوية
 col1, col2, col3 = st.columns(3)
 with col1:
     st.metric("إجمالي السير الذاتية المعالجة", len(df))
@@ -84,38 +126,48 @@ with col3:
     excel_status = "جاهز للتصدير" if not filtered_df.empty else "فارغ"
     st.metric("حالة ملف المخرجات", excel_status)
 
-# زر تصدير النتائج لملفات العمل والـ Excel
-st.download_button(
-    label="📥 تصدير قائمة المرشحين المفلترة كـ CSV",
-    data=filtered_df.to_csv(index=False).encode('utf-8-sig'),
-    file_name='optimized_candidates_report.csv',
-    mime='text/csv'
-)
+# زر تصدير النتائج لملفات العمل والـ CSV
+if not filtered_df.empty:
+    st.download_button(
+        label="📥 تصدير قائمة المرشحين المفلترة كـ CSV",
+        data=filtered_df.to_csv(index=False).encode('utf-8-sig'),
+        file_name='optimized_candidates_report.csv',
+        mime='text/csv'
+    )
 
 # عرض الجدول الرئيسي لأعمدة البيانات المتاحة
 columns_to_show = [
-    "name", "email", "phone", "location", "nationality", "candidate_role", "experience_years", "languages", "match_score", "match_level"
+    "name", "email", "phone", "location", "nationality", "candidate_role", 
+    "experience_years", "languages", "match_score", "match_level"
 ]
 actual_columns = [col for col in columns_to_show if col in filtered_df.columns]
 st.dataframe(filtered_df[actual_columns], use_container_width=True)
 
-# بوابات التواصل المباشر مع المرشحين المختبرين
+# بوابات التواصل المباشر مع المرشحين
 st.markdown("---")
 st.header("📤 قنوات التواصل والربط مع المرشح")
 if not filtered_df.empty:
-    selected_name = st.selectbox("اختر اسماً من القائمة لبدء الاتصال وتدقيق الملف الخاص به:", filtered_df.name)
+    selected_name = st.selectbox(
+        "اختر اسماً من القائمة لبدء الاتصال وتدقيق الملف الخاص به:", 
+        filtered_df.name
+    )
     row = filtered_df[filtered_df.name == selected_name].iloc[0]
 
-    # رسالة تواصل ديناميكية احترافية مستنبطة من مخرجات كود تحليل الدور الوظيفي
-    default_msg = f"""
-السلام عليكم ورحمة الله وبركاته {row['name']},
-نأمل أن تكون بخير. لقد اطلعنا على سيرتك الذاتية الممتازة ونرى أن خبرتك في مجال {row.get('candidate_role', 'الدعم الفني')} متوافقة وممتازة مع متطلباتنا الوظيفية الحالية.
+    # رسالة تواصل ديناميكية احترافية
+    default_msg = f"""السلام عليكم ورحمة الله وبركاته {row['name']},
+نأمل أن تكون بخير. لقد اطلعنا على سيرتك الذاتية الممتازة ونرى أن خبرتك في مجال {row.get('candidate_role', 'الدعم الفني')} تتطابق مع احتياجاتنا.
 هل أنت متاح لإجراء مكالمة هاتفية قصيرة لمناقشة الفرص المتاحة هذا الأسبوع؟
-شاكرين ومقدرين لك.
-""".strip()
+شاكرين ومقدرين لك."""
 
-    msg_template = st.text_area("📩 نص الرسالة المخصصة (يمكنك تعديلها بحرية):", value=default_msg, height=140)
-    subject_text = st.text_input("📝 عنوان موضوع البريد الإلكتروني الافتراضي (Subject):", value="فرصة وظيفية واعدة ومناقشة السيرة الذاتية")
+    msg_template = st.text_area(
+        "📩 نص الرسالة المخصصة (يمكنك تعديلها بحرية):", 
+        value=default_msg, 
+        height=120
+    )
+    subject_text = st.text_input(
+        "📝 عنوان موضوع البريد الإلكتروني:", 
+        value="فرصة وظيفية واعدة"
+    )
     
     encoded_msg = urllib.parse.quote(msg_template)
     email_subject = urllib.parse.quote(subject_text)
@@ -136,27 +188,38 @@ if not filtered_df.empty:
         if pd.notnull(row.get("linkedin")):
             st.markdown(f"[🔗 فتح حساب المرشح في لينكدإن]({row['linkedin']})")
 
-    # بوابة استعراض محتويات السيرة الذاتية وعرضها محلياً بأمان
+    # بوابة استعراض محتويات السيرة الذاتية
     st.markdown("---")
     st.subheader("📄 لوحة المعاينة الفورية لملف السيرة الذاتية")
     if os.path.exists(row['file']):
         ext = os.path.splitext(row['file'])[1].lower()
         if ext == '.pdf':
             with open(row['file'], "rb") as f:
-                st.download_button("📂 تحميل نسخة الـ PDF الحالية للملف", f, file_name=os.path.basename(row['file']))
+                st.download_button(
+                    "📂 تحميل نسخة الـ PDF الحالية للملف", 
+                    f, 
+                    file_name=os.path.basename(row['file'])
+                )
             try:
                 doc = fitz.open(row['file'])
                 text = "\n\n".join([page.get_text() for page in doc])
-                st.text_area("النصوص الكاملة المستخرجة من سياق الـ PDF الحالي للمراجعة العميقة:", text, height=350)
+                st.text_area(
+                    "النصوص الكاملة المستخرجة من الـ PDF:", 
+                    text, 
+                    height=350
+                )
             except Exception as e:
-                st.warning(f"تعذر استخراج وعرض محتويات الـ PDF النصية بالكامل تلقائياً: {e}")
+                st.warning(f"تعذر استخراج محتويات الـ PDF: {e}")
         elif ext in ['.png', '.jpg', '.jpeg']:
             st.image(row['file'], caption=row['name'])
         elif ext in ['.txt', '.docx']:
-            with open(row['file'], "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read()
-                st.text_area("محتويات الملف النصي المفتوح:", content, height=350)
+            try:
+                with open(row['file'], "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                    st.text_area("محتويات الملف النصي المفتوح:", content, height=350)
+            except Exception as e:
+                st.warning(f"تعذر قراءة الملف: {e}")
         else:
-            st.info("نوع وصيغة هذا الملف غير مدعومة للعرض الهيكلي الفوري مباشرة داخل لوحة التحكم.")
+            st.info("نوع وصيغة هذا الملف غير مدعومة للعرض المباشر.")
 else:
     st.warning("نعتذر! لا توجد نتائج مطابقة لخيارات الفلترة والتصفية الحالية.")
