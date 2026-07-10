@@ -5,16 +5,15 @@
 #   The entry point — run it with:  streamlit run src/dashboard.py
 #
 #   It is intentionally SHORT. It only wires the pieces together:
-#     config.py           -> all settings and default texts
-#     extract_cv_data.py  -> reads + scores the CV folder
+#     config.py           -> all settings
+#     i18n.py             -> Arabic/English sentences + language picker
+#     extract_cv_data.py  -> reads + scores the CV files
 #     ui_components.py    -> draws each section of the page
-#
-#   If you want to change a specific part, open the file named above
-#   for that part — you rarely need to edit this file at all.
 # =====================================================================
 
 import os
 import sys
+import tempfile
 
 import pandas as pd
 import streamlit as st
@@ -23,68 +22,104 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from config import ALLOW_ANY_PATH, DATA_ROOT, DEFAULT_JOB_DESCRIPTION, PAGE_TITLE
 from extract_cv_data import load_candidates
+from i18n import render_language_picker, t
+from text_extraction import ocr_available
 from ui_components import render_contact_panel, render_cv_preview, render_filters, render_results
 
 # ---------------------------------------------------------------------
-# 1. PAGE SETUP
+# 1. PAGE SETUP + LANGUAGE
 # ---------------------------------------------------------------------
 st.set_page_config(page_title=PAGE_TITLE, layout="wide")
-st.title(f"📄 {PAGE_TITLE}")
+render_language_picker()
+st.title(f"📄 {t('app_title')}")
+
+if not ocr_available():
+    st.sidebar.warning(f"⚠️ {t('warn_no_ocr')}")
 
 # ---------------------------------------------------------------------
-# 2. CHOOSE THE CV FOLDER (safely)
+# 2. CHOOSE WHERE THE CVS COME FROM: project folder OR upload
 # ---------------------------------------------------------------------
-# On a server, visitors may NOT type arbitrary paths — that would let
-# them browse the server's disk. They can only pick sub-folders of the
-# approved data folder (DATA_ROOT, default ./data). On your own PC set
-# CV_ANALYZER_ALLOW_ANY_PATH=1 to unlock free path input (config.py).
-if ALLOW_ANY_PATH:
-    base_folder = st.sidebar.text_input("📁 مسار مجلد السير الذاتية الأساسي", value=DATA_ROOT)
-else:
-    base_folder = DATA_ROOT
+source = st.sidebar.radio(
+    t("source_label"),
+    options=["folder", "upload"],
+    format_func=lambda key: t(f"source_{key}"),
+)
 
-if not os.path.isdir(base_folder):
-    st.sidebar.error(f"❌ المسار المحدد غير موجود: {base_folder}")
-    st.info("⚠️ أنشئ مجلد data وأضف ملفات السير الذاتية فيه ثم أعد تحميل الصفحة")
-    st.stop()
+cv_folder = None
+upload_signature = ""  # changes whenever the uploaded files change
 
-subfolders = sorted(f.name for f in os.scandir(base_folder) if f.is_dir())
-if subfolders:
-    choice = st.sidebar.selectbox("📁 اختر المجلد الفرعي للمشروع", ["(المجلد الرئيسي)"] + subfolders)
-    cv_folder = base_folder if choice == "(المجلد الرئيسي)" else os.path.join(base_folder, choice)
+if source == "upload":
+    uploaded_files = st.sidebar.file_uploader(
+        t("upload_label"),
+        type=["pdf", "doc", "docx", "png", "jpg", "jpeg", "txt"],
+        accept_multiple_files=True,
+        help=t("upload_hint"),
+    )
+    if not uploaded_files:
+        st.info(t("upload_empty"))
+        st.stop()
+    # Each visitor gets a private temporary folder for their uploads.
+    if "upload_dir" not in st.session_state:
+        st.session_state["upload_dir"] = tempfile.mkdtemp(prefix="cv_uploads_")
+    cv_folder = st.session_state["upload_dir"]
+    for old in os.listdir(cv_folder):          # drop files removed by the user
+        os.remove(os.path.join(cv_folder, old))
+    for uploaded in uploaded_files:
+        safe_name = os.path.basename(uploaded.name)
+        with open(os.path.join(cv_folder, safe_name), "wb") as f:
+            f.write(uploaded.getbuffer())
+    upload_signature = "|".join(sorted(f"{u.name}:{u.size}" for u in uploaded_files))
 else:
-    cv_folder = base_folder
+    # On a server, visitors may NOT type arbitrary paths — that would
+    # let them browse the server's disk. They can only pick sub-folders
+    # of the approved data folder (DATA_ROOT, default ./data). On your
+    # own PC set CV_ANALYZER_ALLOW_ANY_PATH=1 to unlock free path input.
+    if ALLOW_ANY_PATH:
+        base_folder = st.sidebar.text_input("📁", value=DATA_ROOT)
+    else:
+        base_folder = DATA_ROOT
+
+    if not os.path.isdir(base_folder):
+        st.sidebar.error(t("path_missing", path=base_folder))
+        st.info(t("path_hint"))
+        st.stop()
+
+    subfolders = sorted(f.name for f in os.scandir(base_folder) if f.is_dir())
+    if subfolders:
+        choice = st.sidebar.selectbox(t("subfolder_label"), [t("root_folder")] + subfolders)
+        cv_folder = base_folder if choice == t("root_folder") else os.path.join(base_folder, choice)
+    else:
+        cv_folder = base_folder
 
 # ---------------------------------------------------------------------
 # 3. JOB DESCRIPTION INPUT
 # ---------------------------------------------------------------------
-st.markdown("### 🎯 تخصيص متطلبات المطابقة والتوظيف")
-job_description = st.text_area(
-    "📝 الصق الوصف الوظيفي للوظيفة الشاغرة هنا لضبط معايير التطابق آلياً:",
-    value=DEFAULT_JOB_DESCRIPTION,
-    height=120,
-)
+st.markdown(t("jd_header"))
+job_description = st.text_area(t("jd_label"), value=DEFAULT_JOB_DESCRIPTION, height=120)
 
 # ---------------------------------------------------------------------
 # 4. LOAD & SCORE THE CVS (cached so repeat visits are instant)
 # ---------------------------------------------------------------------
-@st.cache_data(show_spinner="جاري معالجة وتحليل مستندات السير الذاتية... يرجى الانتظار قليلاً")
-def cached_load(folder_path: str, jd: str):
+@st.cache_data(show_spinner=False)
+def cached_load(folder_path: str, jd: str, signature: str):
+    # `signature` is part of the cache key: when the uploaded files
+    # change, the analysis re-runs instead of showing stale results.
     records, warnings = load_candidates(folder_path, jd)
     return pd.DataFrame(records), warnings
 
-df, load_warnings = cached_load(cv_folder, job_description)
+with st.spinner(t("spinner")):
+    df, load_warnings = cached_load(cv_folder, job_description, upload_signature)
 
 for warning in load_warnings:
-    st.sidebar.warning(f"⚠️ {warning}")
+    st.sidebar.warning(f"⚠️ {t(warning.pop('key'), **warning)}")
 
 if df.empty:
-    st.warning("⚠️ لا توجد سير ذاتية صالحة أو مقروءة في المجلد المختار حالياً.")
-    st.info("💡 تأكد من وجود ملفات PDF أو DOCX في مجلد data")
+    st.warning(t("no_cvs"))
+    st.info(t("no_cvs_hint"))
     st.stop()
 
-st.sidebar.success(f"✅ تم تحميل {len(df)} سيرة ذاتية")
-if st.sidebar.button("🔄 إعادة تحليل الملفات من جديد"):
+st.sidebar.success(t("loaded_n", n=len(df)))
+if st.sidebar.button(t("reanalyze")):
     st.cache_data.clear()
     st.rerun()
 
@@ -95,7 +130,7 @@ filtered_df = render_filters(df)
 render_results(df, filtered_df)
 
 if filtered_df.empty:
-    st.warning("نعتذر! لا توجد نتائج مطابقة لخيارات الفلترة والتصفية الحالية.")
+    st.warning(t("no_results"))
 else:
     selected_row = render_contact_panel(filtered_df)
     render_cv_preview(selected_row)
