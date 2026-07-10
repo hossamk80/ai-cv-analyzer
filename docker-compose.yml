@@ -8,6 +8,16 @@
 # instead of being copied into the image, so your CV files stay on
 # your machine and the image stays free of personal data.
 # =====================================================================
+# ===== 
+# الطريقة المختصرة الذكية: باستخدام Docker Composeإذا كنت تستخدم أداة Docker Compose عبر ملف docker-compose.yml،
+#فإن هذه الأداة تختصر عليك كل الأوامر أعلاه
+#(البناء، التشغيل، وإعادة البناء للتحديث) في أمر واحد فقط:للبناء والتشغيل لأول مرة (أو للتحديث وإعادة البناء تلقائياً بعد تعديل الكود):
+# bashdocker compose up --build -d
+# Use code with caution.لإعادة التشغيل فقط:
+# bashdocker compose restart
+# Use code with caution.لإيقاف وحذف الخدمات بالكامل:
+# bashdocker compose down
+# ===== 
 services:
   cv-analyzer:
     build: .
