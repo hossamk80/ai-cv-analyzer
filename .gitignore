@@ -9,6 +9,8 @@
 
 # Secrets and generated exports (may contain personal data)
 .env
+# AI provider API keys and usage counters — must never reach GitHub
+ai_providers.json
 *.zip
 *.xlsx
 *.csv

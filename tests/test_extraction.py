@@ -133,3 +133,31 @@ def test_translations_have_matching_keys():
     from i18n import TEXTS
 
     assert set(TEXTS["ar"].keys()) == set(TEXTS["en"].keys())
+
+
+def test_provider_store_roundtrip(tmp_path):
+    from ai_providers import (
+        add_provider,
+        delete_provider,
+        load_providers,
+        record_usage,
+        update_provider,
+    )
+
+    store = str(tmp_path / "providers.json")
+    provider = add_provider("Claude", "anthropic", "claude-opus-4-8", "sk-test", path=store)
+
+    loaded = load_providers(store)
+    assert len(loaded) == 1 and loaded[0]["enabled"] is True
+
+    update_provider(provider["id"], {"enabled": False}, path=store)
+    assert load_providers(store)[0]["enabled"] is False
+
+    # The token meter accumulates across calls
+    record_usage(provider["id"], 100, 40, path=store)
+    record_usage(provider["id"], 50, 10, path=store)
+    usage = load_providers(store)[0]["usage"]
+    assert usage == {"calls": 2, "input_tokens": 150, "output_tokens": 50}
+
+    delete_provider(provider["id"], path=store)
+    assert load_providers(store) == []

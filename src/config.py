@@ -27,6 +27,11 @@ DATA_ROOT = os.environ.get("CV_DATA_ROOT", "./data")
 # folder (e.g. D:\CVS project). Never enable this on a public server.
 ALLOW_ANY_PATH = os.environ.get("CV_ANALYZER_ALLOW_ANY_PATH", "0") == "1"
 
+# Where the AI-provider settings (names, models, API keys, usage
+# counters) are stored. This file is listed in .gitignore so API keys
+# are never uploaded to GitHub.
+AI_PROVIDERS_FILE = os.environ.get("CV_AI_PROVIDERS_FILE", "./ai_providers.json")
+
 # File types the system knows how to read.
 # (.doc — old Word format — needs the free "antiword" tool; it is
 #  installed automatically in Docker, Codespaces and Streamlit Cloud.)
