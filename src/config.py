@@ -91,6 +91,43 @@ KNOWN_LANGUAGES = (
     r"|الإنجليزية|الانجليزية|العربية|الفرنسية|الأردية)"
 )
 
+# Education levels, from highest to lowest. The system reports the
+# HIGHEST level it finds in the CV. The label shown to the user
+# (بكالوريوس / Bachelor…) lives in i18n.py under the same code.
+EDUCATION_LEVELS = [
+    ("phd",        r"(?i)(ph\.?d|doctorate|دكتوراه)"),
+    ("master",     r"(?i)(master|msc|m\.sc|mba|ماجستير)"),
+    ("bachelor",   r"(?i)(bachelor|bsc|b\.sc|b\.eng|بكالوريوس)"),
+    ("diploma",    r"(?i)(diploma|associate|دبلوم)"),
+    ("highschool", r"(?i)(high\s*school|secondary\s*school|ثانوية)"),
+]
+
+# Professional certifications the system recognises. Add your own.
+KNOWN_CERTIFICATIONS = [
+    "CCNA", "CCNP", "CCIE", "MCSA", "MCSE", "MCP", "ITIL", "PMP", "CAPM",
+    "CompTIA A+", "Network+", "Security+", "AWS Certified", "Azure",
+    "CISSP", "CISA", "CISM", "CEH", "OCP", "OCA", "VCP", "RHCE", "RHCSA",
+    "TOGAF", "PRINCE2", "Six Sigma", "SHRM", "CIPD", "SOCPA", "CMA", "CPA",
+]
+
+# Skills the system recognises. Add your own — one entry per skill.
+KNOWN_SKILLS = [
+    "Networking", "Cisco", "Firewall", "Routing", "Switching", "VPN",
+    "Windows Server", "Linux", "Active Directory", "Office 365", "VMware",
+    "Hyper-V", "Azure", "AWS", "SQL", "Oracle", "MySQL", "Python", "Java",
+    "JavaScript", "PHP", "C#", ".NET", "Power BI", "Excel", "SAP", "ERP",
+    "CRM", "Help Desk", "Technical Support", "Troubleshooting", "Backup",
+    "Cybersecurity", "Penetration Testing", "Project Management", "Agile",
+    "Scrum", "Customer Service", "Data Analysis", "Machine Learning",
+    "DevOps", "Docker", "Kubernetes", "HTML", "CSS", "WordPress",
+    "Accounting", "Recruitment", "Payroll", "Marketing", "Sales",
+]
+
+# How much extra weight the structured matching fields (education,
+# certifications, skills) get compared to the free-text job
+# description. 3 = each word you type there counts three times.
+MATCH_FIELD_WEIGHT = 3
+
 # ---------------------------------------------------------------------
 # 4. USER-INTERFACE DEFAULT TEXTS
 # ---------------------------------------------------------------------

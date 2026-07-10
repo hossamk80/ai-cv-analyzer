@@ -21,16 +21,17 @@ import streamlit as st
 sys.path.insert(0, os.path.dirname(__file__))
 
 from config import ALLOW_ANY_PATH, DATA_ROOT, DEFAULT_JOB_DESCRIPTION, PAGE_TITLE
-from extract_cv_data import load_candidates
-from i18n import render_language_picker, t
+from extract_cv_data import build_matching_text, load_candidates
+from i18n import apply_page_direction, render_language_picker, t
 from text_extraction import ocr_available
 from ui_components import render_contact_panel, render_cv_preview, render_filters, render_results
 
 # ---------------------------------------------------------------------
-# 1. PAGE SETUP + LANGUAGE
+# 1. PAGE SETUP + LANGUAGE + PAGE DIRECTION
 # ---------------------------------------------------------------------
 st.set_page_config(page_title=PAGE_TITLE, layout="wide")
 render_language_picker()
+apply_page_direction()  # Arabic reads right-to-left, English left-to-right
 st.title(f"📄 {t('app_title')}")
 
 if not ocr_available():
@@ -92,10 +93,19 @@ else:
         cv_folder = base_folder
 
 # ---------------------------------------------------------------------
-# 3. JOB DESCRIPTION INPUT
+# 3. MATCHING REQUIREMENTS: job description + structured criteria
 # ---------------------------------------------------------------------
 st.markdown(t("jd_header"))
 job_description = st.text_area(t("jd_label"), value=DEFAULT_JOB_DESCRIPTION, height=120)
+
+# Extra criteria typed by the recruiter. They join the matching with
+# more weight than the free text (see build_matching_text).
+crit_cols = st.columns(3)
+req_education = crit_cols[0].text_input(t("crit_education"), placeholder=t("crit_education_ph"))
+req_certs = crit_cols[1].text_input(t("crit_certs"), placeholder=t("crit_certs_ph"))
+req_skills = crit_cols[2].text_input(t("crit_skills"), placeholder=t("crit_skills_ph"))
+
+matching_text = build_matching_text(job_description, req_education, req_certs, req_skills)
 
 # ---------------------------------------------------------------------
 # 4. LOAD & SCORE THE CVS (cached so repeat visits are instant)
@@ -108,7 +118,7 @@ def cached_load(folder_path: str, jd: str, signature: str):
     return pd.DataFrame(records), warnings
 
 with st.spinner(t("spinner")):
-    df, load_warnings = cached_load(cv_folder, job_description, upload_signature)
+    df, load_warnings = cached_load(cv_folder, matching_text, upload_signature)
 
 for warning in load_warnings:
     st.sidebar.warning(f"⚠️ {t(warning.pop('key'), **warning)}")

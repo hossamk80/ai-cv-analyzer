@@ -49,13 +49,29 @@ TEXTS = {
         "warn_error": "خطأ في معالجة {file}: {err}",
         "warn_empty": "لم يُستخرج أي نص من {file}",
         "warn_no_ocr": "محرك القراءة الضوئية (Tesseract) غير مثبت — الملفات الممسوحة ضوئياً والصور لن تُقرأ. ثبته ثم أعد تشغيل التطبيق.",
+        # Matching criteria (typed by the recruiter)
+        "crit_education": "🎓 المستوى التعليمي المطلوب",
+        "crit_education_ph": "مثال: بكالوريوس علوم حاسب",
+        "crit_certs": "📜 الشهادات المهنية المطلوبة",
+        "crit_certs_ph": "مثال: CCNA, ITIL, PMP",
+        "crit_skills": "🛠️ المهارات المطلوبة",
+        "crit_skills_ph": "مثال: Networking, Windows Server, دعم فني",
         # Filters
-        "filter_header": "تصفية وفلترة المرشحين",
-        "city": "اختر المدينة",
-        "nationality": "اختر الجنسية",
-        "match_level_label": "مستوى التطابق المستهدف",
+        "filter_header": "🔍 تصفية وفلترة المرشحين",
+        "city": "المدينة",
+        "nationality": "الجنسية",
+        "education_filter": "المستوى التعليمي",
+        "certs_filter": "الشهادات المهنية",
+        "skills_filter": "المهارات",
+        "match_level_label": "مستوى التطابق",
         "min_exp": "أقل عدد سنوات خبرة عملية",
-        "search": "🔍 بحث نصي حر شامل داخل البيانات",
+        "search": "بحث نصي حر شامل داخل البيانات",
+        # Education levels (codes come from config.py)
+        "phd": "دكتوراه",
+        "master": "ماجستير",
+        "bachelor": "بكالوريوس",
+        "diploma": "دبلوم",
+        "highschool": "ثانوية عامة",
         # Match levels
         "excellent": "ممتاز",
         "fair": "متوسط",
@@ -119,12 +135,26 @@ TEXTS = {
         "warn_error": "Error while processing {file}: {err}",
         "warn_empty": "No text could be extracted from {file}",
         "warn_no_ocr": "The OCR engine (Tesseract) is not installed — scanned files and images cannot be read. Install it and restart the app.",
-        "filter_header": "Filter candidates",
-        "city": "Choose a city",
-        "nationality": "Choose a nationality",
-        "match_level_label": "Target match level",
+        "crit_education": "🎓 Required education level",
+        "crit_education_ph": "e.g. Bachelor of Computer Science",
+        "crit_certs": "📜 Required professional certifications",
+        "crit_certs_ph": "e.g. CCNA, ITIL, PMP",
+        "crit_skills": "🛠️ Required skills",
+        "crit_skills_ph": "e.g. Networking, Windows Server, technical support",
+        "filter_header": "🔍 Filter candidates",
+        "city": "City",
+        "nationality": "Nationality",
+        "education_filter": "Education level",
+        "certs_filter": "Certifications",
+        "skills_filter": "Skills",
+        "match_level_label": "Match level",
         "min_exp": "Minimum years of experience",
-        "search": "🔍 Free-text search across all data",
+        "search": "Free-text search across all data",
+        "phd": "PhD",
+        "master": "Master's",
+        "bachelor": "Bachelor's",
+        "diploma": "Diploma",
+        "highschool": "High school",
         "excellent": "Excellent",
         "fair": "Fair",
         "poor": "Weak",
@@ -170,7 +200,53 @@ def t(key: str, **kwargs) -> str:
     return text.format(**kwargs) if kwargs else text
 
 
+def current_lang() -> str:
+    return st.session_state.get("lang", "ar")
+
+
+def _set_lang(code: str) -> None:
+    st.session_state["lang"] = code
+
+
 def render_language_picker() -> None:
-    """Draw the language selector at the top of the sidebar."""
-    choice = st.sidebar.selectbox("🌐 اللغة | Language", list(LANGUAGES))
-    st.session_state["lang"] = LANGUAGES[choice]
+    """Draw two language BUTTONS at the top of the sidebar.
+
+    The active language is highlighted; clicking the other one
+    switches the whole page instantly.
+    """
+    lang = current_lang()
+    col_ar, col_en = st.sidebar.columns(2)
+    col_ar.button(
+        "العربية",
+        type="primary" if lang == "ar" else "secondary",
+        use_container_width=True,
+        on_click=_set_lang, args=("ar",),
+    )
+    col_en.button(
+        "English",
+        type="primary" if lang == "en" else "secondary",
+        use_container_width=True,
+        on_click=_set_lang, args=("en",),
+    )
+
+
+def apply_page_direction() -> None:
+    """Flip the page right-to-left for Arabic, left-to-right for English."""
+    if current_lang() == "ar":
+        st.markdown(
+            """
+            <style>
+            /* Right-to-left layout for Arabic */
+            [data-testid="stAppViewContainer"] .main,
+            [data-testid="stSidebarContent"],
+            [data-testid="stMain"] {
+                direction: rtl;
+                text-align: right;
+            }
+            [data-testid="stSidebar"] { direction: rtl; }
+            /* Keep code, links and numbers readable */
+            pre, code { direction: ltr; text-align: left; }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )

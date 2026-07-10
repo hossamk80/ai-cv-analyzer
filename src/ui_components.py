@@ -22,30 +22,64 @@ from i18n import t
 
 
 # ---------------------------------------------------------------------
-# SECTION: sidebar filters
+# SECTION: filters (shown at the TOP of the page, above the results)
 # ---------------------------------------------------------------------
+def _options_from_joined(series: pd.Series) -> list[str]:
+    """Turn a column like 'Cisco / Linux' into a sorted option list."""
+    values = set()
+    for cell in series.dropna():
+        for part in str(cell).split(" / "):
+            if part.strip():
+                values.add(part.strip())
+    return sorted(values)
+
+
 def render_filters(df: pd.DataFrame) -> pd.DataFrame:
-    """Draw the sidebar filters and return the filtered table."""
-    with st.sidebar:
-        st.header(t("filter_header"))
-        city = st.selectbox(t("city"), options=[""] + sorted(df.location.dropna().unique()))
-        nationality = st.selectbox(t("nationality"), options=[""] + sorted(df.nationality.dropna().unique()))
-        match_level = st.multiselect(
-            t("match_level_label"),
-            options=sorted(df.match_level.unique()),
-            default=sorted(df.match_level.unique()),
-            format_func=t,  # shows ممتاز/Excellent per language
-        )
-        min_experience = st.slider(t("min_exp"), min_value=0, max_value=30, value=0)
-        search_text = st.text_input(t("search"))
+    """Draw the filter panel at the top of the page; return the
+    filtered table. Every dropdown allows MULTIPLE selections.
+
+    Behaviour: city / nationality / education / match level keep a
+    candidate when they match ANY selected value; skills and
+    certifications require ALL selected values (a recruiter who picks
+    "Cisco" and "Linux" wants candidates who have both).
+    """
+    st.markdown("---")
+    st.subheader(t("filter_header"))
+
+    row1 = st.columns(4)
+    city = row1[0].multiselect(t("city"), options=sorted(df.location.dropna()[df.location != ""].unique()))
+    nationality = row1[1].multiselect(t("nationality"), options=sorted(df.nationality.dropna()[df.nationality != ""].unique()))
+    education = row1[2].multiselect(
+        t("education_filter"),
+        options=[e for e in ("phd", "master", "bachelor", "diploma", "highschool")
+                 if e in set(df.education.dropna().unique())],
+        format_func=t,
+    )
+    match_level = row1[3].multiselect(
+        t("match_level_label"),
+        options=[l for l in ("excellent", "fair", "poor") if l in set(df.match_level.unique())],
+        format_func=t,
+    )
+
+    row2 = st.columns(4)
+    skills = row2[0].multiselect(t("skills_filter"), options=_options_from_joined(df.skills))
+    certifications = row2[1].multiselect(t("certs_filter"), options=_options_from_joined(df.certifications))
+    min_experience = row2[2].slider(t("min_exp"), min_value=0, max_value=30, value=0)
+    search_text = row2[3].text_input(t("search"))
 
     filtered = df.copy()
     if city:
-        filtered = filtered[filtered.location.str.contains(city, case=False, na=False)]
+        filtered = filtered[filtered.location.isin(city)]
     if nationality:
-        filtered = filtered[filtered.nationality.str.contains(nationality, case=False, na=False)]
+        filtered = filtered[filtered.nationality.isin(nationality)]
+    if education:
+        filtered = filtered[filtered.education.isin(education)]
     if match_level:
         filtered = filtered[filtered.match_level.isin(match_level)]
+    for skill in skills:
+        filtered = filtered[filtered.skills.str.contains(skill, case=False, na=False, regex=False)]
+    for cert in certifications:
+        filtered = filtered[filtered.certifications.str.contains(cert, case=False, na=False, regex=False)]
     if "experience_years" in filtered.columns:
         filtered["experience_years"] = pd.to_numeric(filtered["experience_years"], errors="coerce")
         filtered = filtered[
@@ -69,12 +103,19 @@ def render_results(df: pd.DataFrame, filtered: pd.DataFrame) -> None:
 
     columns_to_show = [
         "name", "email", "phone", "location", "nationality", "candidate_role",
-        "experience_years", "languages", "match_score", "match_level",
+        "experience_years", "education", "certifications", "skills",
+        "languages", "match_score", "match_level",
     ]
     actual = [c for c in columns_to_show if c in filtered.columns]
     display = filtered[actual].sort_values("match_score", ascending=False).copy()
-    # Turn the internal level codes into words in the visitor's language
+    # Turn the internal codes into words in the visitor's language
     display["match_level"] = display["match_level"].map(t)
+    display["education"] = display["education"].map(lambda e: t(e) if e else "")
+    if "experience_years" in display.columns:
+        # show a blank cell instead of "None" when no experience found
+        display["experience_years"] = display["experience_years"].map(
+            lambda v: "" if pd.isna(v) else str(int(v)) if str(v).replace(".0", "").isdigit() else str(v)
+        )
 
     if not display.empty:
         st.download_button(

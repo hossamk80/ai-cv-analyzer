@@ -12,7 +12,14 @@
 
 import re
 
-from config import KNOWN_LANGUAGES, KNOWN_LOCATIONS, KNOWN_ROLES
+from config import (
+    EDUCATION_LEVELS,
+    KNOWN_CERTIFICATIONS,
+    KNOWN_LANGUAGES,
+    KNOWN_LOCATIONS,
+    KNOWN_ROLES,
+    KNOWN_SKILLS,
+)
 
 
 def clean_text(text: str) -> str:
@@ -71,6 +78,36 @@ def extract_experience_years(text: str) -> str:
 def extract_languages(text: str) -> str:
     found = re.findall(KNOWN_LANGUAGES, text)
     return " / ".join(sorted({lang.capitalize() for lang in found}))
+
+
+def extract_education(text: str) -> str:
+    """Return the HIGHEST education level found ('phd', 'master', ...).
+
+    The label shown on screen (بكالوريوس / Bachelor…) comes from
+    i18n.py; the level codes and keywords live in config.py.
+    """
+    for code, pattern in EDUCATION_LEVELS:
+        if re.search(pattern, text):
+            return code
+    return ""
+
+
+def extract_certifications(text: str) -> str:
+    """Return the professional certifications found, e.g. 'CCNA / PMP'."""
+    found = []
+    for cert in KNOWN_CERTIFICATIONS:
+        if re.search(r"(?<![\w+])" + re.escape(cert) + r"(?![\w+])", text, re.IGNORECASE):
+            found.append(cert)
+    return " / ".join(found)
+
+
+def extract_skills(text: str) -> str:
+    """Return the known skills found in the CV, e.g. 'Cisco / Linux'."""
+    found = []
+    for skill in KNOWN_SKILLS:
+        if re.search(r"(?<!\w)" + re.escape(skill) + r"(?!\w)", text, re.IGNORECASE):
+            found.append(skill)
+    return " / ".join(found)
 
 
 def infer_candidate_role(text: str) -> str:
