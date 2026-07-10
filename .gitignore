@@ -1,21 +1,28 @@
-# دوت إنف والملفات الحساسة
+# =====================================================================
+# BLOCK: GIT IGNORE RULES (.gitignore)
+# ---------------------------------------------------------------------
+# Files matching these patterns are never uploaded to GitHub.
+# NOTE: files that were ALREADY committed before a rule was added stay
+# in the repository — the rule only stops NEW files. The CVs in data/
+# are still tracked for that reason (see the review notes).
+# =====================================================================
+
+# Secrets and generated exports (may contain personal data)
 .env
 *.zip
 *.xlsx
 *.csv
 
-# البيانات والسير الذاتية المحلية
+# Local CV files — personal data must not be uploaded
 data/
-D:/
 
-# ملفات بايثون المؤقتة
+# Python temporary files
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .pytest_cache/
 
-# بيئات العمل الافتراضية
+# Virtual environments
 venv/
 env/
-.streamlit/config.toml
