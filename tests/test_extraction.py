@@ -13,10 +13,13 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from field_extraction import (
+    extract_certifications,
+    extract_education,
     extract_email,
     extract_experience_years,
     extract_nationality,
     extract_phone,
+    extract_skills,
 )
 from matching import classify_match, classify_matches, score_cvs
 
@@ -89,6 +92,30 @@ def test_legacy_doc_extraction():
     if not os.path.exists(doc):
         pytest.skip("sample .doc not present")
     assert "Youssef" in extract_text(doc)
+
+
+def test_extract_education_returns_highest_level():
+    assert extract_education("Bachelor of Science and later a Master degree") == "master"
+    assert extract_education("حاصل على بكالوريوس هندسة") == "bachelor"
+    assert extract_education("no education mentioned") == ""
+
+
+def test_extract_certifications():
+    assert extract_certifications("Certified: CCNA, ITIL v4 and PMP") == "CCNA / ITIL / PMP"
+    assert extract_certifications("nothing here") == ""
+
+
+def test_extract_skills():
+    found = extract_skills("Experienced in Cisco networking and Linux servers")
+    assert "Cisco" in found and "Linux" in found
+
+
+def test_matching_text_weighting():
+    from extract_cv_data import build_matching_text
+
+    text = build_matching_text("support engineer", skills="cisco")
+    assert text.count("cisco") == 3  # MATCH_FIELD_WEIGHT default
+    assert build_matching_text("support engineer") == "support engineer"
 
 
 def test_translations_have_matching_keys():

@@ -17,7 +17,8 @@
       ]
     }
   },
-  "updateContentCommand": "[ -f packages.txt ] && sudo apt-get update && sudo xargs apt-get install -y --no-install-recommends <packages.txt; [ -f requirements.txt ] && pip3 install --user -r requirements.txt; echo 'Packages installed and requirements met'",
+  "onCreateCommand": "bash .devcontainer/setup.sh",
+  "updateContentCommand": "bash .devcontainer/setup.sh",
   "postAttachCommand": {
     "server": "streamlit run src/dashboard.py --server.enableCORS false --server.enableXsrfProtection false"
   },

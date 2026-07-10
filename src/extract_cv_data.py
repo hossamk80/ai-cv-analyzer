@@ -16,15 +16,18 @@ import glob
 import os
 from datetime import datetime
 
-from config import SUPPORTED_EXTENSIONS
+from config import MATCH_FIELD_WEIGHT, SUPPORTED_EXTENSIONS
 from field_extraction import (
     clean_text,
+    extract_certifications,
+    extract_education,
     extract_email,
     extract_experience_years,
     extract_languages,
     extract_location,
     extract_nationality,
     extract_phone,
+    extract_skills,
     infer_candidate_role,
 )
 from matching import classify_match, classify_matches, score_cvs
@@ -51,10 +54,29 @@ def extract_cv_record(filepath: str) -> dict | None:
         "nationality": extract_nationality(text),
         "experience_years": extract_experience_years(text),
         "languages": extract_languages(text),
+        "education": extract_education(text),
+        "certifications": extract_certifications(text),
+        "skills": extract_skills(text),
         "candidate_role": infer_candidate_role(text),
         "extracted_at": datetime.now(),
         "_text": text,  # kept temporarily for scoring; dropped later
     }
+
+
+def build_matching_text(job_description: str, education: str = "",
+                        certifications: str = "", skills: str = "") -> str:
+    """Combine the job description with the structured requirement
+    fields into one matching text.
+
+    The structured fields (education, certifications, skills) are
+    repeated MATCH_FIELD_WEIGHT times (see config.py) so a skill you
+    explicitly asked for counts more than a word buried in the free
+    job-description text.
+    """
+    extras = " ".join(part for part in (education, certifications, skills) if part and part.strip())
+    if not extras:
+        return job_description
+    return job_description + (" " + extras) * MATCH_FIELD_WEIGHT
 
 
 def load_candidates(folder_path: str, job_description: str) -> tuple[list[dict], list[str]]:
