@@ -1,46 +1,56 @@
 @echo off
-chcp 65001 >nul
+REM ================================================================
+REM WINDOWS LAUNCHER (run.bat)
+REM Double-click this file to start the CV Analyzer.
+REM The first run installs libraries and takes a few minutes.
+REM Keep this window OPEN while using the app.
+REM
+REM NOTE: this file must contain plain English text only. The old
+REM version had Arabic text, which cmd.exe garbles into broken
+REM commands ("xit", "kdir"), so the app never started.
+REM ================================================================
 
-echo 🚀 بدء تشغيل تطبيق تحليل السير الذاتية...
-echo.
+REM Always work from the folder this file lives in
+cd /d "%~dp0"
 
-REM التحقق من Python
+REM --- Find Python (tries "python", then the "py" launcher) ---
+set PYTHON=python
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo ❌ Python غير مثبت. يرجى تثبيته أولاً.
-    pause
-    exit /b 1
+    py --version >nul 2>&1
+    if errorlevel 1 (
+        echo [ERROR] Python is not installed or not on PATH.
+        echo.
+        echo Download it from: https://www.python.org/downloads/
+        echo IMPORTANT: tick "Add Python to PATH" during installation.
+        pause
+        exit /b 1
+    )
+    set PYTHON=py
 )
+echo [OK] Python found.
 
-echo ✓ Python موجود
-
-REM التحقق من وجود venv
+REM --- Create the virtual environment on first run ---
 if not exist "venv" (
-    echo 📦 إنشاء بيئة افتراضية...
-    python -m venv venv
+    echo [SETUP] Creating virtual environment - first run only...
+    %PYTHON% -m venv venv
 )
 
-REM تفعيل البيئة الافتراضية
-echo ✓ تفعيل البيئة الافتراضية...
 call venv\Scripts\activate.bat
 
-REM تثبيت المتطلبات
-echo 📥 تثبيت المكتبات المطلوبة...
+echo [SETUP] Installing required libraries - please wait...
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
-REM التحقق من وجود مجلد data
-if not exist "data" (
-    echo 📁 إنشاء مجلد data...
-    mkdir data
-)
+if not exist "data" mkdir data
 
-REM تشغيل التطبيق
 echo.
-echo ✨ جاري تشغيل التطبيق...
-echo الرابط: http://localhost:8501
+echo [RUN] Starting the app... your browser link is:
 echo.
-
-streamlit run src/dashboard.py
+echo        http://localhost:8501
+echo.
+echo Keep this window open while using the app.
+echo.
+streamlit run src\dashboard.py
 
 pause
