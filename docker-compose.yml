@@ -1,0 +1,18 @@
+# =====================================================================
+# BLOCK: DOCKER COMPOSE (docker-compose.yml)
+# ---------------------------------------------------------------------
+# One command starts everything:   docker compose up --build
+# Then open http://localhost:8501
+#
+# The local ./data folder is ATTACHED to the container (read-only)
+# instead of being copied into the image, so your CV files stay on
+# your machine and the image stays free of personal data.
+# =====================================================================
+services:
+  cv-analyzer:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data:ro
+    restart: unless-stopped

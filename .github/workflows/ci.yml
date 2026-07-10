@@ -1,0 +1,47 @@
+# =====================================================================
+# BLOCK: CONTINUOUS INTEGRATION (.github/workflows/ci.yml)
+# ---------------------------------------------------------------------
+# IMPORTANT: GitHub only runs workflow files placed inside the
+# .github/workflows/ folder. The previous file lived at the repository
+# root (workflows-streamlit-deploy.yml), so it NEVER actually ran.
+#
+# This workflow installs the app and runs the automated tests on every
+# push and pull request. If a change breaks the system, GitHub shows a
+# red X on the commit before the change reaches your users.
+# =====================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install system dependencies (OCR engine)
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-ara
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run automated tests
+        run: pytest tests/ -v
+
+      - name: Check the app imports cleanly
+        run: python -c "import sys; sys.path.insert(0, 'src'); import extract_cv_data; print('OK')"
