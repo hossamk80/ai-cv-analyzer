@@ -115,7 +115,10 @@ def load_candidates(folder_path: str, job_description: str) -> tuple[list[dict],
     for record, score, level in zip(records, scores, levels):
         record["match_score"] = score
         record["match_level"] = level
-        del record["_text"]
+        # Kept (renamed) so the per-candidate analysis panel and the
+        # free-text search can look inside the CV content. It is never
+        # shown as a table column or exported to CSV.
+        record["cv_text"] = record.pop("_text")
 
     return records, warnings
 

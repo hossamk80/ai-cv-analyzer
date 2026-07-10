@@ -58,6 +58,27 @@ def score_cvs(cv_texts: list[str], job_description: str) -> list[float]:
     return [round(float(s) * 100, 2) for s in similarities]
 
 
+def explain_match(cv_text: str, matching_text: str, max_terms: int = 15) -> tuple[list[str], list[str]]:
+    """Explain WHY a CV scored what it did.
+
+    Compares the meaningful words of the job requirements against the
+    CV text (both Arabic-normalised) and returns two lists:
+      matched  - requirement words found in the CV
+      missing  - requirement words NOT found in the CV
+    """
+    cv_norm = normalize_arabic(cv_text.lower())
+    terms, seen = [], set()
+    for token in re.findall(r"[\w+#.]+", normalize_arabic(matching_text.lower())):
+        token = token.strip(".")
+        if len(token) < 3 or token in STOP_WORDS or token in seen:
+            continue
+        seen.add(token)
+        terms.append(token)
+    matched = [term for term in terms if term in cv_norm]
+    missing = [term for term in terms if term not in cv_norm]
+    return matched[:max_terms], missing[:max_terms]
+
+
 def classify_matches(scores: list[float]) -> list[str]:
     """Grade every candidate RELATIVE to the best match in the batch.
 
