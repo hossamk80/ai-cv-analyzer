@@ -118,6 +118,17 @@ def test_matching_text_weighting():
     assert build_matching_text("support engineer") == "support engineer"
 
 
+def test_explain_match():
+    from matching import explain_match
+
+    matched, missing = explain_match(
+        "senior engineer with cisco and linux experience",
+        "network engineer cisco firewall",
+    )
+    assert "cisco" in matched and "engineer" in matched
+    assert "firewall" in missing and "network" in missing
+
+
 def test_translations_have_matching_keys():
     from i18n import TEXTS
 

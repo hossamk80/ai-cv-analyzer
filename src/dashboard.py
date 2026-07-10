@@ -20,6 +20,7 @@ import streamlit as st
 
 sys.path.insert(0, os.path.dirname(__file__))
 
+from analytics_ui import render_analytics_dashboard, render_candidate_analysis
 from config import ALLOW_ANY_PATH, DATA_ROOT, DEFAULT_JOB_DESCRIPTION, PAGE_TITLE
 from extract_cv_data import build_matching_text, load_candidates
 from i18n import apply_page_direction, render_language_picker, t
@@ -134,7 +135,7 @@ if st.sidebar.button(t("reanalyze")):
     st.rerun()
 
 # ---------------------------------------------------------------------
-# 5. FILTERS -> RESULTS TABLE -> CONTACT -> PREVIEW
+# 5. FILTERS -> RESULTS -> ANALYTICS -> CANDIDATE ANALYSIS -> CONTACT
 # ---------------------------------------------------------------------
 filtered_df = render_filters(df)
 render_results(df, filtered_df)
@@ -142,5 +143,9 @@ render_results(df, filtered_df)
 if filtered_df.empty:
     st.warning(t("no_results"))
 else:
+    # Charts about the whole filtered pool
+    render_analytics_dashboard(filtered_df)
+    # Pick a candidate, then see their analytical summary vs the job
     selected_row = render_contact_panel(filtered_df)
+    render_candidate_analysis(selected_row, filtered_df, matching_text)
     render_cv_preview(selected_row)
