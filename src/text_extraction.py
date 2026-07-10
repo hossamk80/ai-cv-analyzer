@@ -13,6 +13,8 @@
 
 import logging
 import os
+import shutil
+import subprocess
 
 import docx                      # reads .docx Word files
 import fitz                      # PyMuPDF — reads PDF files
@@ -22,12 +24,20 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 
+def ocr_available() -> bool:
+    """True when the Tesseract OCR engine is installed on this machine.
+
+    Without it, scanned PDFs and image CVs cannot be read. It is
+    installed automatically in Docker, Codespaces and Streamlit Cloud;
+    on your own PC install it from the Tesseract project page.
+    """
+    return shutil.which("tesseract") is not None
+
+
 def extract_text(path: str) -> str:
     """Return the plain text of a CV file, or '' if it cannot be read.
 
-    Supported: .pdf, .docx, .png, .jpg, .jpeg, .txt
-    (Old .doc files are NOT supported — ask candidates for PDF/DOCX,
-    or open the file in Word and re-save it as .docx.)
+    Supported: .pdf, .doc, .docx, .png, .jpg, .jpeg, .txt
     """
     ext = os.path.splitext(path)[1].lower()
     try:
@@ -35,6 +45,8 @@ def extract_text(path: str) -> str:
             return _read_pdf(path)
         if ext == ".docx":
             return _read_docx(path)
+        if ext == ".doc":
+            return _read_legacy_doc(path)
         if ext in (".png", ".jpg", ".jpeg"):
             return _read_image(path)
         if ext == ".txt":
@@ -53,6 +65,8 @@ def _read_pdf(path: str) -> str:
     # fall back to OCR on each page so scanned CVs still work.
     if len(text.strip()) >= 40:
         return text
+    if not ocr_available():
+        return text  # the dashboard warns the user that OCR is missing
     with fitz.open(path) as doc:
         ocr_parts = []
         for page in doc:
@@ -72,6 +86,19 @@ def _read_docx(path: str) -> str:
             for cell in row.cells:
                 parts.append(cell.text)
     return "\n".join(parts)
+
+
+def _read_legacy_doc(path: str) -> str:
+    # Old .doc files (Word 97-2003) are read with the free "antiword"
+    # tool. It is installed automatically in Docker, Codespaces and
+    # Streamlit Cloud (see packages.txt / Dockerfile).
+    if shutil.which("antiword") is None:
+        logger.error("antiword غير مثبت — لا يمكن قراءة ملفات .doc القديمة")
+        return ""
+    result = subprocess.run(
+        ["antiword", path], capture_output=True, text=True, timeout=60
+    )
+    return result.stdout if result.returncode == 0 else ""
 
 
 def _read_image(path: str) -> str:

@@ -63,13 +63,35 @@ def test_empty_job_description_gives_zero():
 
 
 def test_classify_levels():
-    assert classify_match(50.0) == "ممتاز"
-    assert classify_match(20.0) == "متوسط"
-    assert classify_match(5.0) == "ضعيف"
+    # Levels are internal codes; i18n.py turns them into ممتاز/Excellent.
+    assert classify_match(50.0) == "excellent"
+    assert classify_match(20.0) == "fair"
+    assert classify_match(5.0) == "poor"
 
 
 def test_relative_grading():
     # Best score defines 100%; others graded relative to it.
-    assert classify_matches([10.0, 8.0, 4.5, 1.0]) == ["ممتاز", "ممتاز", "متوسط", "ضعيف"]
+    assert classify_matches([10.0, 8.0, 4.5, 1.0]) == ["excellent", "excellent", "fair", "poor"]
     # All-zero scores must not crash (division by zero guard).
-    assert classify_matches([0.0, 0.0]) == ["ضعيف", "ضعيف"]
+    assert classify_matches([0.0, 0.0]) == ["poor", "poor"]
+
+
+def test_legacy_doc_extraction():
+    import shutil
+
+    import pytest
+
+    from text_extraction import extract_text
+
+    if shutil.which("antiword") is None:
+        pytest.skip("antiword not installed")
+    doc = os.path.join(os.path.dirname(__file__), "..", "data", "Youssef_SalahOCP_812641489.doc")
+    if not os.path.exists(doc):
+        pytest.skip("sample .doc not present")
+    assert "Youssef" in extract_text(doc)
+
+
+def test_translations_have_matching_keys():
+    from i18n import TEXTS
+
+    assert set(TEXTS["ar"].keys()) == set(TEXTS["en"].keys())

@@ -62,7 +62,9 @@ def load_candidates(folder_path: str, job_description: str) -> tuple[list[dict],
 
     Returns (records, warnings):
       records  - one dict per successfully-read CV, ready for a table
-      warnings - human-readable messages about files that were skipped
+      warnings - one dict per skipped file: {"key": ..., "file": ...}.
+                 The dashboard translates the key into the visitor's
+                 language (see i18n.py), so no sentences live here.
     """
     records, warnings = [], []
 
@@ -70,16 +72,17 @@ def load_candidates(folder_path: str, job_description: str) -> tuple[list[dict],
         if not os.path.isfile(filepath):
             continue
         ext = os.path.splitext(filepath)[1].lower()
+        name = os.path.basename(filepath)
         if ext not in SUPPORTED_EXTENSIONS:
-            warnings.append(f"تم تجاهل {os.path.basename(filepath)} — الصيغة {ext} غير مدعومة")
+            warnings.append({"key": "warn_unsupported", "file": name, "ext": ext})
             continue
         try:
             record = extract_cv_record(filepath)
         except Exception as exc:
-            warnings.append(f"خطأ في معالجة {os.path.basename(filepath)}: {exc}")
+            warnings.append({"key": "warn_error", "file": name, "err": str(exc)})
             continue
         if record is None:
-            warnings.append(f"لم يُستخرج أي نص من {os.path.basename(filepath)}")
+            warnings.append({"key": "warn_empty", "file": name})
             continue
         records.append(record)
 

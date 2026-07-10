@@ -32,7 +32,7 @@ jobs:
           cache: pip
 
       - name: Install system dependencies (OCR engine)
-        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-ara
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-ara antiword
 
       - name: Install Python dependencies
         run: |

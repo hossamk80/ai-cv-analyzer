@@ -28,7 +28,9 @@ DATA_ROOT = os.environ.get("CV_DATA_ROOT", "./data")
 ALLOW_ANY_PATH = os.environ.get("CV_ANALYZER_ALLOW_ANY_PATH", "0") == "1"
 
 # File types the system knows how to read.
-SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".png", ".jpg", ".jpeg", ".txt"}
+# (.doc — old Word format — needs the free "antiword" tool; it is
+#  installed automatically in Docker, Codespaces and Streamlit Cloud.)
+SUPPORTED_EXTENSIONS = {".pdf", ".doc", ".docx", ".png", ".jpg", ".jpeg", ".txt"}
 
 # ---------------------------------------------------------------------
 # 2. MATCH-SCORE SETTINGS
@@ -46,9 +48,11 @@ RELATIVE_FAIR = 0.40        # >= 40% of the best score -> "متوسط"
 SCORE_EXCELLENT = 35.0
 SCORE_FAIR = 15.0
 
-LEVEL_EXCELLENT = "ممتاز"
-LEVEL_FAIR = "متوسط"
-LEVEL_POOR = "ضعيف"
+# Internal level codes. The words shown to the user (ممتاز/Excellent…)
+# live in i18n.py and follow the visitor's language choice.
+LEVEL_EXCELLENT = "excellent"
+LEVEL_FAIR = "fair"
+LEVEL_POOR = "poor"
 
 # Words ignored during matching because they carry no meaning.
 STOP_WORDS = [
@@ -90,18 +94,12 @@ KNOWN_LANGUAGES = (
 # ---------------------------------------------------------------------
 # 4. USER-INTERFACE DEFAULT TEXTS
 # ---------------------------------------------------------------------
+# All sentences shown on screen live in i18n.py (Arabic + English).
+# Only language-independent defaults stay here.
 
-PAGE_TITLE = "لوحة تحليل السير الذاتية الاحترافية"
+PAGE_TITLE = "CV Analyzer | تحليل السير الذاتية"
 
 DEFAULT_JOB_DESCRIPTION = (
     "مأمور دعم فني | Technical support officer - "
     "خبرة في الشبكات والدعم الفني وصيانة الحواسب والأنظمة الفنية"
 )
-
-DEFAULT_EMAIL_SUBJECT = "فرصة وظيفية واعدة"
-
-# {name} and {role} are filled in automatically for each candidate.
-DEFAULT_CONTACT_MESSAGE = """السلام عليكم ورحمة الله وبركاته {name},
-نأمل أن تكون بخير. لقد اطلعنا على سيرتك الذاتية الممتازة ونرى أن خبرتك في مجال {role} تتطابق مع احتياجاتنا.
-هل أنت متاح لإجراء مكالمة هاتفية قصيرة لمناقشة الفرص المتاحة هذا الأسبوع؟
-شاكرين ومقدرين لك."""

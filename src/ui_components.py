@@ -5,8 +5,9 @@
 #   The reusable visual pieces of the dashboard. Each function draws
 #   ONE section of the page. dashboard.py just calls them in order.
 #
+#   Every sentence comes from t("...") so the whole page follows the
+#   visitor's language choice (Arabic / English — see i18n.py).
 #   To change how a section LOOKS, edit the matching function here.
-#   To change WHAT DATA it shows, look at extract_cv_data.py instead.
 # =====================================================================
 
 import os
@@ -17,7 +18,7 @@ import fitz
 import pandas as pd
 import streamlit as st
 
-from config import DEFAULT_CONTACT_MESSAGE, DEFAULT_EMAIL_SUBJECT
+from i18n import t
 
 
 # ---------------------------------------------------------------------
@@ -26,16 +27,17 @@ from config import DEFAULT_CONTACT_MESSAGE, DEFAULT_EMAIL_SUBJECT
 def render_filters(df: pd.DataFrame) -> pd.DataFrame:
     """Draw the sidebar filters and return the filtered table."""
     with st.sidebar:
-        st.header("تصفية وفلترة المرشحين")
-        city = st.selectbox("اختر المدينة", options=[""] + sorted(df.location.dropna().unique()))
-        nationality = st.selectbox("اختر الجنسية", options=[""] + sorted(df.nationality.dropna().unique()))
+        st.header(t("filter_header"))
+        city = st.selectbox(t("city"), options=[""] + sorted(df.location.dropna().unique()))
+        nationality = st.selectbox(t("nationality"), options=[""] + sorted(df.nationality.dropna().unique()))
         match_level = st.multiselect(
-            "مستوى التطابق المستهدف",
+            t("match_level_label"),
             options=sorted(df.match_level.unique()),
             default=sorted(df.match_level.unique()),
+            format_func=t,  # shows ممتاز/Excellent per language
         )
-        min_experience = st.slider("أقل عدد سنوات خبرة عملية", min_value=0, max_value=30, value=0)
-        search_text = st.text_input("🔍 بحث نصي حر شامل داخل البيانات")
+        min_experience = st.slider(t("min_exp"), min_value=0, max_value=30, value=0)
+        search_text = st.text_input(t("search"))
 
     filtered = df.copy()
     if city:
@@ -61,27 +63,27 @@ def render_filters(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------
 def render_results(df: pd.DataFrame, filtered: pd.DataFrame) -> None:
     col1, col2, col3 = st.columns(3)
-    col1.metric("إجمالي السير الذاتية المعالجة", len(df))
-    col2.metric("عدد النتائج المطابقة للفلترة", len(filtered))
-    col3.metric("متوسط نسبة التطابق", f"{filtered.match_score.mean():.1f}%" if not filtered.empty else "—")
-
-    if not filtered.empty:
-        st.download_button(
-            label="📥 تصدير قائمة المرشحين المفلترة كـ CSV",
-            data=filtered.to_csv(index=False).encode("utf-8-sig"),
-            file_name="candidates_report.csv",
-            mime="text/csv",
-        )
+    col1.metric(t("total_cvs"), len(df))
+    col2.metric(t("filtered_count"), len(filtered))
+    col3.metric(t("avg_score"), f"{filtered.match_score.mean():.1f}%" if not filtered.empty else "—")
 
     columns_to_show = [
         "name", "email", "phone", "location", "nationality", "candidate_role",
         "experience_years", "languages", "match_score", "match_level",
     ]
     actual = [c for c in columns_to_show if c in filtered.columns]
-    st.dataframe(
-        filtered[actual].sort_values("match_score", ascending=False),
-        use_container_width=True,
-    )
+    display = filtered[actual].sort_values("match_score", ascending=False).copy()
+    # Turn the internal level codes into words in the visitor's language
+    display["match_level"] = display["match_level"].map(t)
+
+    if not display.empty:
+        st.download_button(
+            label=t("export_csv"),
+            data=display.to_csv(index=False).encode("utf-8-sig"),
+            file_name="candidates_report.csv",
+            mime="text/csv",
+        )
+    st.dataframe(display, use_container_width=True)
 
 
 # ---------------------------------------------------------------------
@@ -90,20 +92,18 @@ def render_results(df: pd.DataFrame, filtered: pd.DataFrame) -> None:
 def render_contact_panel(filtered: pd.DataFrame) -> pd.Series:
     """Draw the candidate contact section; return the selected row."""
     st.markdown("---")
-    st.header("📤 قنوات التواصل والربط مع المرشح")
+    st.header(t("contact_header"))
 
-    selected_name = st.selectbox(
-        "اختر اسماً من القائمة لبدء الاتصال وتدقيق الملف الخاص به:",
-        filtered.name,
-    )
+    selected_name = st.selectbox(t("choose_candidate"), filtered.name)
     row = filtered[filtered.name == selected_name].iloc[0]
 
-    default_msg = DEFAULT_CONTACT_MESSAGE.format(
+    default_msg = t(
+        "default_message",
         name=row["name"],
-        role=row.get("candidate_role") or "الدعم الفني",
+        role=row.get("candidate_role") or t("default_role"),
     )
-    msg_template = st.text_area("📩 نص الرسالة المخصصة (يمكنك تعديلها بحرية):", value=default_msg, height=120)
-    subject_text = st.text_input("📝 عنوان موضوع البريد الإلكتروني:", value=DEFAULT_EMAIL_SUBJECT)
+    msg_template = st.text_area(t("message_label"), value=default_msg, height=120)
+    subject_text = st.text_input(t("subject_label"), value=t("default_subject"))
 
     encoded_msg = urllib.parse.quote(msg_template)
     email_subject = urllib.parse.quote(subject_text)
@@ -112,13 +112,13 @@ def render_contact_panel(filtered: pd.DataFrame) -> pd.Series:
     with c1:
         if pd.notnull(row.get("phone")) and row.get("phone"):
             phone_str = str(row["phone"]).replace("+", "").replace(".0", "")
-            st.markdown(f"[📱 أرسل عبر واتساب مباشرة](https://wa.me/{phone_str}?text={encoded_msg})")
+            st.markdown(f"[{t('whatsapp')}](https://wa.me/{phone_str}?text={encoded_msg})")
     with c2:
         if pd.notnull(row.get("email")) and row.get("email"):
-            st.markdown(f"[📧 إرسال بريد إلكتروني رسمي](mailto:{row['email']}?subject={email_subject}&body={encoded_msg})")
+            st.markdown(f"[{t('email_btn')}](mailto:{row['email']}?subject={email_subject}&body={encoded_msg})")
     with c3:
         if pd.notnull(row.get("linkedin")):
-            st.markdown(f"[🔗 فتح حساب المرشح في لينكدإن]({row['linkedin']})")
+            st.markdown(f"[{t('linkedin')}]({row['linkedin']})")
     return row
 
 
@@ -127,36 +127,35 @@ def render_contact_panel(filtered: pd.DataFrame) -> pd.Series:
 # ---------------------------------------------------------------------
 def render_cv_preview(row: pd.Series) -> None:
     st.markdown("---")
-    st.subheader("📄 لوحة المعاينة الفورية لملف السيرة الذاتية")
+    st.subheader(t("preview_header"))
 
     if not os.path.exists(row["file"]):
-        st.info("الملف الأصلي لم يعد موجوداً على القرص.")
+        st.info(t("file_missing"))
         return
 
     ext = os.path.splitext(row["file"])[1].lower()
     if ext == ".pdf":
         with open(row["file"], "rb") as f:
-            st.download_button("📂 تحميل نسخة الـ PDF الحالية للملف", f, file_name=os.path.basename(row["file"]))
+            st.download_button(t("pdf_download"), f, file_name=os.path.basename(row["file"]))
         try:
             with fitz.open(row["file"]) as doc:
                 text = "\n\n".join(page.get_text() for page in doc)
-            st.text_area("النصوص الكاملة المستخرجة من الـ PDF:", text, height=350)
+            st.text_area(t("pdf_text"), text, height=350)
         except Exception as exc:
-            st.warning(f"تعذر استخراج محتويات الـ PDF: {exc}")
+            st.warning(t("pdf_error", err=exc))
     elif ext in (".png", ".jpg", ".jpeg"):
         st.image(row["file"], caption=row["name"])
     elif ext == ".docx":
-        # A .docx is a compressed archive — the old code opened it as a
-        # plain text file and displayed unreadable symbols. Read it with
-        # the proper Word library instead.
+        # A .docx is a compressed archive — it must be read with the
+        # Word library, never as a plain text file.
         try:
             document = docx.Document(row["file"])
             content = "\n".join(p.text for p in document.paragraphs)
-            st.text_area("محتويات ملف الوورد:", content, height=350)
+            st.text_area(t("docx_content"), content, height=350)
         except Exception as exc:
-            st.warning(f"تعذر قراءة ملف الوورد: {exc}")
+            st.warning(t("docx_error", err=exc))
     elif ext == ".txt":
         with open(row["file"], "r", encoding="utf-8", errors="ignore") as f:
-            st.text_area("محتويات الملف النصي:", f.read(), height=350)
+            st.text_area(t("txt_content"), f.read(), height=350)
     else:
-        st.info("نوع وصيغة هذا الملف غير مدعومة للعرض المباشر.")
+        st.info(t("unsupported_preview"))
