@@ -17,10 +17,9 @@
       ]
     }
   },
-  "onCreateCommand": "bash .devcontainer/setup.sh",
-  "updateContentCommand": "bash .devcontainer/setup.sh",
+  "postCreateCommand": "bash .devcontainer/setup.sh || true",
   "postAttachCommand": {
-    "server": "streamlit run src/dashboard.py --server.enableCORS false --server.enableXsrfProtection false"
+    "server": "streamlit run src/dashboard.py --server.enableCORS false --server.enableXsrfProtection false || true"
   },
   "portsAttributes": {
     "8501": {
