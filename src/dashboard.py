@@ -79,11 +79,23 @@ def render_analysis_tab() -> None:
             st.info(t("upload_empty"))
             return
         # Each visitor gets a private temporary folder for their uploads.
-        if "upload_dir" not in st.session_state:
-            st.session_state["upload_dir"] = tempfile.mkdtemp(prefix="cv_uploads_")
-        cv_folder = st.session_state["upload_dir"]
-        for old in os.listdir(cv_folder):      # drop files removed by the user
-            os.remove(os.path.join(cv_folder, old))
+        # The folder may vanish (temp cleanup / new container) or a rerun
+        # may race the cleanup, so recreate it and ignore already-gone
+        # files instead of crashing.
+        upload_dir = st.session_state.get("upload_dir")
+        if not upload_dir or not os.path.isdir(upload_dir):
+            upload_dir = tempfile.mkdtemp(prefix="cv_uploads_")
+            st.session_state["upload_dir"] = upload_dir
+        cv_folder = upload_dir
+
+        # Start clean: keep only the files that are currently uploaded.
+        wanted = {os.path.basename(u.name) for u in uploaded_files}
+        for old in os.listdir(cv_folder):
+            if old not in wanted:
+                try:
+                    os.remove(os.path.join(cv_folder, old))
+                except OSError:
+                    pass  # already removed by a concurrent rerun
         for uploaded in uploaded_files:
             safe_name = os.path.basename(uploaded.name)
             with open(os.path.join(cv_folder, safe_name), "wb") as f:
